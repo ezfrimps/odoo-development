@@ -1,0 +1,77 @@
+---
+- hosts: all
+  become: true
+
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    postgres_version: '13'
+
+  tasks:
+    - name: Install gnu pg
+      apt:
+        name:
+          - gnupg
+          - gnupg2
+        state: present
+
+    - name: Add postgresql repo apt-key
+      apt_key:
+        url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+        state: present
+
+    - name: Add postgresql apt-repository
+      apt_repository:
+        repo: deb http://apt.postgresql.org/pub/repos/apt/ buster-pgdg main
+
+    - name: Update and install postgres packages
+      apt:
+        name: 
+          - bash
+          - acl
+          - python3-psycopg2
+          - "postgresql-{{postgres_version}}"
+        state: latest
+        update_cache: true
+
+    - name: Create an odoo database
+      postgresql_db:
+        name: odoo
+        template: template0
+        encoding: UTF8
+        state: present
+      become_user: postgres
+
+    - name: Create an odoo user
+      postgresql_user:
+        name: odoo
+        password: password
+        db: odoo
+        priv: ALL
+        state: present
+      become_user: postgres
+
+    - name: Allow md5 connection for the odoo user
+      postgresql_pg_hba:
+        dest: "/etc/postgresql/{{postgres_version}}/main/pg_hba.conf"
+        contype: host
+        databases: "all"
+        users: "all"
+        address: 0.0.0.0/0
+        method: md5
+        state: present
+      become_user: postgres
+
+    - name: Update postgresql configuration
+      lineinfile:
+        dest: "/etc/postgresql/{{postgres_version}}/main/postgresql.conf"
+        regexp: "^#?listen_addresses"
+        line: "listen_addresses = '*'"
+        state: present
+      notify: restart_postgresql
+
+  handlers:
+    - name: restart_postgresql
+      service:
+        name: postgresql
+        state: restarted
+        
