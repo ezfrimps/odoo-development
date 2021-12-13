@@ -46,7 +46,7 @@
         name: odoo
         password: password
         db: odoo
-        priv: ALL
+        role_attr_flags: CREATEDB,NOSUPERUSER
         state: present
       become_user: postgres
 
